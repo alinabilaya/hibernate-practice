@@ -24,21 +24,21 @@ public class PaintingGalleryHibernate {
   public static void main(String[] args) {
     sessionFactory = new Configuration()
 
-        //        For h2 DB
-//        .setProperty("hibernate.connection.driver_class", "org.h2.Driver")
-//        .setProperty("hibernate.connection.url", "jdbc:h2:mem:books_db;DB_CLOSE_DELAY=-1")
-//        .setProperty("hibernate.show_sql", "true")
-//        .setProperty("hibernate.hbm2ddl.auto", "update")
-//        .setProperty("hibernate.connection.isolation", "4")
-//        .setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect")
-
-        .setProperty("hibernate.connection.driver_class", "com.mysql.jdbc.Driver")
-        .setProperty("hibernate.connection.url", "jdbc:mysql://localhost/hibernate")
-        .setProperty("hibernate.connection.username", "root")
-        .setProperty("hibernate.connection.password", "221155")
+//                For h2 DB
+        .setProperty("hibernate.connection.driver_class", "org.h2.Driver")
+        .setProperty("hibernate.connection.url", "jdbc:h2:mem:books_db;DB_CLOSE_DELAY=-1")
         .setProperty("hibernate.show_sql", "true")
+        .setProperty("hibernate.hbm2ddl.auto", "update")
         .setProperty("hibernate.connection.isolation", "4")
-        .setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect")
+        .setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect")
+
+//        .setProperty("hibernate.connection.driver_class", "com.mysql.jdbc.Driver")
+//        .setProperty("hibernate.connection.url", "jdbc:mysql://localhost/hibernate")
+//        .setProperty("hibernate.connection.username", "root")
+//        .setProperty("hibernate.connection.password", "")
+//        .setProperty("hibernate.show_sql", "true")
+//        .setProperty("hibernate.connection.isolation", "4")
+//        .setProperty("hibernate.dialect", "org.hibernate.dialect.MySQLDialect")
         .addAnnotatedClass(Address.class)
         .addAnnotatedClass(Artist.class)
         .addAnnotatedClass(Painting.class)
@@ -50,8 +50,13 @@ public class PaintingGalleryHibernate {
 //    createArtistAndPainting("Michelangelo", "Italy", "The Musicians", 1595, null);
 //    createArtistAndPainting("Pablo Picasso", "Spain", "Guernica", 1937, null);
 //    createPrivateGallery();
-//    findPainting();
-    findAllArtistPainting();
+//    findPainting();//
+
+      createArtist("Michelangelo", "Italy");
+      createPaintingAndSetArtist("TestPainting", 1585, "some summary", "Michelangelo");
+      createPublicGalleryAndSetPainting("Some museum", "UK", "London", "some address", "TestPainting");
+      findAllArtistPaintings("Michelangelo");
+      findGalleryByPainting("TestPainting");
 
     sessionFactory.close();
   }
@@ -77,58 +82,147 @@ public class PaintingGalleryHibernate {
 
     session.persist(artist);
 
-    log.info("Created new artist {} with id {}", artist.getName(), artist.getId());
+    log.info("Created new artist {} with id {} and new painting {} with id {}.", artist.getName(),
+            artist.getId(), painting.getTitle(), painting.getId() + "\n");
 
     session.getTransaction().commit();
     session.close();
   }
 
-  static void createPrivateGallery() {
+  static void createArtist(String artistName, String artistCountry) {
+
+    log.info("Create new Artist");
+    final Session session = sessionFactory.openSession();
+    session.getTransaction().begin();
+
+    final Artist artist = new Artist();
+    artist.setName(artistName);
+    artist.setCountry(artistCountry);
+
+    session.persist(artist);
+
+    log.info("Created new artist {} with id {}", artist.getName(), artist.getId() +"\n");
+
+    session.getTransaction().commit();
+    session.close();
+  }
+
+  static void createPaintingAndSetArtist (String paintingTitle, int paintingDateMade,
+                                          String paintingSummary, String artistName) {
+    log.info("Create new Painting and set its artist");
+    final Session session = sessionFactory.openSession();
+    session.getTransaction().begin();
+
+    Query query = session.createQuery("from Artist a where a.name=:n").setParameter("n", artistName);
+    final Artist artist = (Artist) query.uniqueResult();
+
+    final Painting painting = new Painting();
+    painting.setTitle(paintingTitle);
+    painting.setDateMade(paintingDateMade);
+    painting.setSummary(paintingSummary);
+    painting.setArtist(artist);
+
+    session.persist(painting);
+
+    log.info("Created new painting {} with id {} and set its artist: {}", painting.getTitle(), painting.getId(),
+            artist.getName() + "\n");
+
+    session.getTransaction().commit();
+    session.close();
+  }
+
+  static void createPrivateGalleryAndSetPainting(String paintingTitle) {
     log.info("Create private Painting gallery");
     final Session session = sessionFactory.openSession();
     session.getTransaction().begin();
 
     final PrivateGallery privateGallery = new PrivateGallery();
 
-    Query query = session.createQuery("SELECT * from Painting p where p.title=:t").setParameter("t", "The elephants");
-    final Painting elephants = (Painting) query.uniqueResult();
+    Query query = session.createQuery("from Painting p where p.title=:t").setParameter("t", paintingTitle);
+    final Painting painting = (Painting) query.uniqueResult();
 
-    elephants.setPaintingGallery(privateGallery);
+    painting.setPaintingGallery(privateGallery);
 
     session.persist(privateGallery);
-    log.info("Created new artist {} with id {}", privateGallery.getId());
+
+    log.info("Created new private gallery {} with id {} and set painting {}", privateGallery.getClass().getSimpleName(),
+            privateGallery.getId(), painting.getTitle() + "\n");
 
     session.getTransaction().commit();
     session.close();
   }
 
-  static void findPainting() {
+  static void createPublicGalleryAndSetPainting(String galleryOwner, String country, String city,
+                                                String street, String paintingTitle) {
+    log.info("Create public Painting gallery");
+    final Session session = sessionFactory.openSession();
+    session.getTransaction().begin();
+
+    final PublicGallery publicGallery = new PublicGallery();
+    final Address address = new Address();
+    address.setCountry(country);
+    address.setCity(city);
+    address.setStreet(street);
+    publicGallery.setOwner(galleryOwner);
+    publicGallery.setAddress(address);
+
+    Query query = session.createQuery("from Painting p where p.title=:t").setParameter("t", paintingTitle);
+    final Painting painting = (Painting) query.uniqueResult();
+
+    painting.setPaintingGallery(publicGallery);
+
+    session.persist(publicGallery);
+
+    log.info("Created new public gallery {} with id {} and set painting {}", publicGallery.getClass().getSimpleName(),
+            publicGallery.getId(), painting.getTitle() + "\n");
+
+    session.getTransaction().commit();
+    session.close();
+  }
+
+  static void findPainting(String paintingTitle) {
     log.info("Find painting");
     final Session session = sessionFactory.openSession();
     session.getTransaction().begin();
 
-    Query query = session.createQuery("from Painting p where p.title=:t").setParameter("t", "The elephants");
+    Query query = session.createQuery("from Painting p where p.title=:t").setParameter("t", paintingTitle);
     Painting painting = (Painting)query.uniqueResult();
 
-    System.out.println("\n" + "query result is:" + "\n" + painting);
+    System.out.println("\n" + "query result is:" + "\n" + painting +"\n");
 
     session.getTransaction().commit();
     session.close();
   }
 
-  static void findAllArtistPainting() {
+  static void findGalleryByPainting (String paintingTitle) {
+    log.info("Find gallery by painting");
+    final Session session = sessionFactory.openSession();
+    session.getTransaction().begin();
+
+    Query query = session.createQuery("from Painting p where p.title=:t").setParameter("t", paintingTitle);
+    Painting painting = (Painting)query.uniqueResult();
+
+    PaintingGallery gallery = painting.getPaintingGallery();
+
+    System.out.println("\n" + "query result is:" + "\n" + gallery);
+
+    session.getTransaction().commit();
+    session.close();
+  }
+
+  static void findAllArtistPaintings(String artistName) {
     log.info("Find all painting by artist");
     final Session session = sessionFactory.openSession();
     session.getTransaction().begin();
 
-    final Artist vanGogh = (Artist)session
+    final Artist artist = (Artist)session
         .createQuery("from Artist a where a.name=:n")
-        .setParameter("n", "Vincent van Gogh")
+        .setParameter("n", artistName)
         .uniqueResult();
 
-    Set<Painting> paintings = vanGogh.getPaintings();
+    Set<Painting> paintings = artist.getPaintings();
     for(Painting painting : paintings)
-      System.out.println("query result is:" + "\n" + painting);
+      System.out.println("query result is:" + "\n" + painting + "\n");
 
     session.getTransaction().commit();
     session.close();

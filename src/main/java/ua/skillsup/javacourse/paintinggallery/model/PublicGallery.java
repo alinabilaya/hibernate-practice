@@ -29,4 +29,13 @@ public class PublicGallery extends PaintingGallery {
   public Set<Painting> getPaintings() { return paintings; }
 
   public void setPaintings(Set<Painting> paintings) { this.paintings = paintings; }
+
+  @Override
+  public String toString() {
+    return "Public gallery {" +
+            "id= " + getId() +
+            ", owner= " + getOwner() +
+            ", address= " + address +
+            "}";
+  }
 }
